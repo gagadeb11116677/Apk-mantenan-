@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxury World Clock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .clock-hand {
+            transform-origin: bottom center;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .moon-phase {
+            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-blue-900 min-h-screen font-[Poppins] text-white">
+    <div class="container mx-auto px-4 py-12">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                World Chrono Lux
+            </h1>
+            <div class="relative max-w-md mx-auto">
+                <input list="timezones" id="timezone-select" 
+                       class="w-full px-6 py-3 rounded-full glass-effect focus:outline-none focus:ring-2 focus:ring-cyan-400 transition-all"
+                       placeholder="Cari Zona Waktu...">
+                <datalist id="timezones"></datalist>
+                <button id="locate-btn" class="absolute right-3 top-3 p-2 hover:text-cyan-400 transition-colors">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Clock -->
+        <div class="max-w-4xl mx-auto glass-effect rounded-3xl p-8 shadow-2xl mb-8">
+            <!-- Digital Clock -->
+            <div class="text-center mb-8">
+                <div id="digital-clock" class="text-7xl font-light mb-4 animate-pulse-slow">
+                    <span id="hours">00</span>:<span id="minutes">00</span>:<span id="seconds">00</span>
+                </div>
+                <div id="date" class="text-xl text-cyan-300"></div>
+                <div id="timezone" class="text-lg text-blue-300"></div>
+            </div>
+
+            <!-- Analog Clock -->
+            <div class="relative w-64 h-64 mx-auto mb-8">
+                <div class="absolute inset-0 rounded-full glass-effect"></div>
+                <div id="hour-hand" class="clock-hand absolute left-1/2 bottom-1/2 w-1 h-16 bg-cyan-400 origin-bottom"></div>
+                <div id="minute-hand" class="clock-hand absolute left-1/2 bottom-1/2 w-1 h-24 bg-blue-400 origin-bottom"></div>
+                <div id="second-hand" class="clock-hand absolute left-1/2 bottom-1/2 w-0.5 h-28 bg-red-400 origin-bottom"></div>
+            </div>
+
+            <!-- Additional Info -->
+            <div class="grid md:grid-cols-3 gap-6 text-center">
+                <div class="moon-phase p-4 rounded-xl">
+                    <div class="text-cyan-400 mb-2"><i class="fas fa-moon"></i></div>
+                    <div id="moon-phase" class="text-sm">Fase Bulan</div>
+                </div>
+                <div class="glass-effect p-4 rounded-xl">
+                    <div class="text-blue-400 mb-2"><i class="fas fa-globe"></i></div>
+                    <div id="utc-offset" class="text-sm">UTC Offset</div>
+                </div>
+                <div class="glass-effect p-4 rounded-xl">
+                    <div class="text-cyan-400 mb-2"><i class="fas fa-sun"></i></div>
+                    <div id="daylight" class="text-sm">Daylight</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        let currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        let moonPhases = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initTimezoneSelector();
+            updateClock();
+            setInterval(updateClock, 1000);
+            setupEventListeners();
+            detectLocation();
+        });
+
+        // Initialize Timezone Selector
+        function initTimezoneSelector() {
+            const timezones = Intl.supportedValuesOf('timeZone');
+            const datalist = document.getElementById('timezones');
+            
+            timezones.forEach(tz => {
+                const option = document.createElement('option');
+                option.value = tz;
+                datalist.appendChild(option);
+            });
+            
+            document.getElementById('timezone-select').value = currentTimezone;
+        }
+
+        // Update Clock
+        function updateClock() {
+            const options = {
+                timeZone: currentTimezone,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+            
+            const dateOptions = {
+                timeZone: currentTimezone,
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            };
+            
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', options);
+            const dateFormatter = new Intl.DateTimeFormat('en-US', dateOptions);
+            const [hours, minutes, seconds] = formatter.format(now).split(/:| /);
+            
+            // Update Digital Clock
+            document.getElementById('hours').textContent = hours;
+            document.getElementById('minutes').textContent = minutes;
+            document.getElementById('seconds').textContent = seconds;
+            document.getElementById('date').textContent = dateFormatter.format(now);
+            document.getElementById('timezone').textContent = currentTimezone;
+            
+            // Update Analog Clock
+            updateAnalogClock(now);
+            
+            // Update Additional Info
+            updateAdditionalInfo(now);
+        }
+
+        // Update Analog Clock
+        function updateAnalogClock(date) {
+            const hours = date.getHours() % 12;
+            const minutes = date.getMinutes();
+            const seconds = date.getSeconds();
+            
+            document.getElementById('hour-hand').style.transform = 
+                `rotate(${(hours * 30) + (minutes * 0.5)}deg)`;
+            document.getElementById('minute-hand').style.transform = 
+                `rotate(${(minutes * 6) + (seconds * 0.1)}deg)`;
+            document.getElementById('second-hand').style.transform = 
+                `rotate(${seconds * 6}deg)`;
+        }
+
+        // Update Additional Info
+        function updateAdditionalInfo(date) {
+            // UTC Offset
+            const offset = -date.getTimezoneOffset() / 60;
+            document.getElementById('utc-offset').textContent = 
+                `UTC${offset >= 0 ? '+' : ''}${offset}`;
+            
+            // Moon Phase
+            const phase = Math.floor((date.getDate() / 29.53) * 8) % 8;
+            document.getElementById('moon-phase').textContent = 
+                `${moonPhases[phase]} ${['New Moon', 'Waxing Crescent', 'First Quarter', 
+                'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 
+                'Waning Crescent'][phase]}`;
+            
+            // Daylight Saving
+            const isDST = new Date(date.getFullYear(), 6, 1).getTimezoneOffset() === 
+                        date.getTimezoneOffset();
+            document.getElementById('daylight').textContent = 
+                isDST ? 'Daylight Saving Time' : 'Standard Time';
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
+            document.getElementById('timezone-select').addEventListener('change', (e) => {
+                currentTimezone = e.target.value;
+                updateClock();
+            });
+            
+            document.getElementById('locate-btn').addEventListener('click', detectLocation);
+        }
+
+        // Detect Location
+        function detectLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    currentTimezone = tz;
+                    document.getElementById('timezone-select').value = tz;
+                    updateClock();
+                });
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+</body>
+</html>
